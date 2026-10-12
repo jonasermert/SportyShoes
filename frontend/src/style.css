@@ -1,3 +1,34 @@
 @import "tailwindcss";
-@theme {--font-sans: "Arial", sans-serif;}
-body{@apply bg-stone-100 text-stone-900;}button{@apply cursor-pointer rounded-lg bg-stone-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40;}input,select,textarea{@apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900;}label{@apply block text-sm font-medium;}label input,label select,label textarea{@apply mt-1;}h2{@apply mb-5 text-2xl font-semibold;}th,td{@apply border-b border-stone-200 px-4 py-3 text-left;}button:focus-visible,a:focus-visible{@apply outline-2 outline-offset-4 outline-orange-600;}
+@theme {
+  --font-sans: "Arial", sans-serif;
+}
+body {
+  @apply bg-stone-100 text-stone-900;
+}
+button {
+  @apply cursor-pointer rounded-lg bg-stone-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40;
+}
+input,
+select,
+textarea {
+  @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900;
+}
+label {
+  @apply block text-sm font-medium;
+}
+label input,
+label select,
+label textarea {
+  @apply mt-1;
+}
+h2 {
+  @apply mb-5 text-2xl font-semibold;
+}
+th,
+td {
+  @apply border-b border-stone-200 px-4 py-3 text-left;
+}
+button:focus-visible,
+a:focus-visible {
+  @apply outline-2 outline-offset-4 outline-orange-600;
+}

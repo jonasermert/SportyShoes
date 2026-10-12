@@ -1,22 +1,564 @@
-import React,{useEffect,useState} from 'react';import{request}from'./api';import'./style.css';
-const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'EUR'}).format(n);
-const empty={name:'',category:'Running',description:'',price:'',stock:0,active:true};
-export function App(){
- const[user,setUser]=useState(null),[page,setPage]=useState('shop'),[products,setProducts]=useState([]),[orders,setOrders]=useState([]),[users,setUsers]=useState([]),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[category,setCategory]=useState(''),[search,setSearch]=useState(''),[filters,setFilters]=useState({from:'',to:'',category:''}),[edit,setEdit]=useState(null),[register,setRegister]=useState(false);
- async function run(fn){setBusy(true);setError('');setNotice('');try{await fn();}catch(e){setError(e.message);}finally{setBusy(false);}}
- async function load(){const p=await request(user?.role==='ADMIN'&&page==='products'?'/admin/products':'/products');setProducts(p);if(page==='reports')setOrders(await request('/admin/reports?'+new URLSearchParams(filters)));if(page==='users')setUsers(await request('/admin/users?'+new URLSearchParams({search})));if(page==='orders'&&user)setOrders(await request('/purchases'));}
- useEffect(()=>{request('/me').then(setUser).catch(()=>{});},[]);
- useEffect(()=>{run(load);},[page,user]);
- const categories=[...new Set(products.map(p=>p.category))];
- async function login(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.target));await run(async()=>{if(register)await request('/register',{method:'POST',body:data});await request('/login',{method:'POST',body:new URLSearchParams({username:data.email.trim().toLowerCase(),password:data.password})});setUser(await request('/me'));setPage('shop');});}
- function field(label,name,type='text',value,onChange){return <label>{label}<input name={name} type={type} required value={value} onChange={onChange}/></label>;}
- return <><header className="border-b border-stone-200 bg-white"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5"><a className="text-2xl font-black tracking-tight" href="#" onClick={()=>setPage('shop')}>SPORTY<span className="text-orange-600">SHOES.</span></a><nav className="flex flex-wrap items-center gap-2" aria-label="Main navigation">{[['shop','Collection'],...(user?[['orders','My purchases'],['password','Password']]:[]),...(user?.role==='ADMIN'?[['products','Products'],['users','Users'],['reports','Reports']]:[])].map(([id,label])=><button key={id} className={page===id?'bg-orange-600':'bg-stone-700'} onClick={()=>setPage(id)}>{label}</button>)}{user?<button onClick={()=>run(async()=>{await request('/logout',{method:'POST'});setUser(null);setPage('shop');})}>Sign out</button>:<button onClick={()=>setPage('login')}>Sign in</button>}</nav></div></header><main className="mx-auto max-w-6xl px-6 py-8">{error&&<p role="alert" className="mb-5 rounded-lg bg-red-100 p-4 text-red-800">{error}</p>}{notice&&<p role="status" className="mb-5 rounded-lg bg-green-100 p-4">{notice}</p>}{busy&&<p role="status">Loading…</p>}
- {page==='shop'&&<><section className="mb-9 rounded-3xl bg-stone-900 p-8 text-white sm:p-14"><p className="mb-5 text-sm uppercase tracking-[.3em] text-orange-400">Built for your next step</p><h1 className="max-w-xl text-5xl font-black leading-tight sm:text-7xl">Move your way.</h1><p className="mt-6 max-w-lg text-lg text-stone-300">From the first mile to the final rep. Find the shoes that keep you moving.</p></section><div className="mb-6 flex items-center justify-between gap-6"><h2 className="mb-0">The collection</h2><label>Category<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label></div><div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{products.filter(p=>!category||p.category===category).map(p=><article key={p.id} className="overflow-hidden rounded-2xl bg-white shadow-sm"><div className="flex h-40 items-center justify-center bg-orange-100 text-7xl" aria-hidden="true">👟</div><div className="p-6"><p className="text-xs uppercase tracking-widest text-orange-700">{p.category}</p><h3 className="mt-2 text-xl font-bold">{p.name}</h3><p className="my-3 text-sm text-stone-600">{p.description}</p><p className="mb-4 text-lg font-semibold">{money(p.price)} <span className="text-xs font-normal text-stone-500">{p.stock} in stock</span></p><button disabled={busy||!p.stock} onClick={()=>user?run(async()=>{await request('/purchases',{method:'POST',body:{productId:p.id,quantity:1}});await load();setNotice('Purchase confirmed. View it in My purchases.');}):setPage('login')}>{p.stock?'Buy one pair':'Sold out'}</button></div></article>)}</div>{products.length===0&&!busy&&<p>No products available.</p>}</>}
- {page==='login'&&<section className="mx-auto max-w-md rounded-2xl bg-white p-8"><h2>{register?'Create an account':'Welcome back'}</h2><form onSubmit={login} className="space-y-4">{register&&field('Name','name')}{field('Email','email','email')}{<label>Password<input name="password" type="password" required minLength={register?8:1} maxLength={72}/></label>}<button disabled={busy}>{register?'Register and sign in':'Sign in'}</button></form><button className="mt-5 bg-stone-600" onClick={()=>setRegister(!register)}>{register?'Already registered? Sign in':'Create an account'}</button></section>}
- {page==='password'&&<section className="mx-auto max-w-md rounded-2xl bg-white p-8"><h2>Change password</h2><form className="space-y-4" onSubmit={e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.target));run(async()=>{await request('/password',{method:'POST',body});setUser(null);setPage('login');setNotice('Password updated. Sign in with your new password.');});}}>{field('Current password','currentPassword','password')}<label>New password<input name="newPassword" type="password" minLength="8" maxLength="72" required/></label><button disabled={busy}>Update password</button></form></section>}
- {page==='products'&&<><div className="mb-6 flex justify-between"><h2>Manage products</h2><button onClick={()=>setEdit({...empty})}>Add product</button></div>{edit&&<form className="mb-8 grid gap-4 rounded-2xl bg-white p-6 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();run(async()=>{await request('/admin/products'+(edit.id?'/'+edit.id:''),{method:edit.id?'PUT':'POST',body:{...edit,price:Number(edit.price),stock:Number(edit.stock)}});setEdit(null);await load();setNotice('Product saved.');});}}>{['name','category','price','stock','description'].map(k=><label key={k}>{k}<input required={k!=='description'} type={['price','stock'].includes(k)?'number':'text'} min={k==='price'?'.01':k==='stock'?'0':undefined} step={k==='price'?'.01':k==='stock'?'1':undefined} value={edit[k]??''} onChange={e=>setEdit({...edit,[k]:e.target.value})}/></label>)}<label className="flex items-center gap-3"><input className="w-auto" type="checkbox" checked={edit.active} onChange={e=>setEdit({...edit,active:e.target.checked})}/>Visible in shop</label><button disabled={busy}>Save product</button><button type="button" onClick={()=>setEdit(null)}>Cancel</button></form>}<div className="overflow-x-auto"><table className="w-full bg-white"><thead><tr>{['Product','Category','Price','Stock','Status','Actions'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{products.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.category}</td><td>{money(p.price)}</td><td>{p.stock}</td><td>{p.active?'Active':'Archived'}</td><td className="flex gap-2"><button onClick={()=>setEdit({...p})}>Edit</button><button disabled={busy||!p.active} onClick={()=>run(async()=>{await request('/admin/products/'+p.id,{method:'DELETE'});await load();})}>Archive</button></td></tr>)}</tbody></table></div></>}
- {page==='users'&&<><h2>Registered users</h2><form className="mb-5 flex gap-3" onSubmit={e=>{e.preventDefault();run(load);}}><label className="grow">Search by name or email<input value={search} onChange={e=>setSearch(e.target.value)}/></label><button disabled={busy}>Search</button></form><div className="overflow-x-auto"><table className="w-full bg-white"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Registered</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.name}</td><td>{u.email}</td><td>{u.role}</td><td>{new Date(u.createDate).toLocaleDateString()}</td></tr>)}</tbody></table></div>{!users.length&&!busy&&<p>No matching users.</p>}</>}
- {['reports','orders'].includes(page)&&<><h2>{page==='reports'?'Purchase reports':'My purchases'}</h2>{page==='reports'&&<form className="mb-6 flex flex-wrap items-end gap-3" onSubmit={e=>{e.preventDefault();run(load);}}>{['from','to'].map(k=><label key={k}>{k==='from'?'From (inclusive)':'To (inclusive)'}<input type="date" value={filters[k]} onChange={e=>setFilters({...filters,[k]:e.target.value})}/></label>)}<label>Category<input placeholder="All categories" value={filters.category} onChange={e=>setFilters({...filters,category:e.target.value})}/></label><button disabled={busy}>Apply filters</button></form>}<p className="mb-4">{orders.length} purchases · Total {money(orders.reduce((s,o)=>s+Number(o.total),0))}</p><div className="overflow-x-auto"><table className="w-full bg-white"><thead><tr>{['Date','Customer','Product','Category','Quantity','Total'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{orders.map(o=><tr key={o.id}><td>{o.date}</td><td>{o.customer}</td><td>{o.product}</td><td>{o.category}</td><td>{o.quantity}</td><td>{money(o.total)}</td></tr>)}</tbody></table></div>{!orders.length&&!busy&&<p>No purchases found.</p>}</>}
- </main><footer className="mx-auto max-w-6xl px-6 py-10 text-sm text-stone-500">SportyShoes · Stakeholder prototype · Purchases are simulated; no payment is collected.</footer></>;
+import React, { useEffect, useState } from "react";
+import { request } from "./api";
+import "./style.css";
+const money = (n) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(
+    n,
+  );
+const empty = {
+  name: "",
+  category: "Running",
+  description: "",
+  price: "",
+  stock: 0,
+  active: true,
+};
+export function App() {
+  const [user, setUser] = useState(null),
+    [page, setPage] = useState("shop"),
+    [products, setProducts] = useState([]),
+    [orders, setOrders] = useState([]),
+    [users, setUsers] = useState([]),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [category, setCategory] = useState(""),
+    [search, setSearch] = useState(""),
+    [filters, setFilters] = useState({ from: "", to: "", category: "" }),
+    [edit, setEdit] = useState(null),
+    [register, setRegister] = useState(false);
+  async function run(fn) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await fn();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function load() {
+    const p = await request(
+      user?.role === "ADMIN" && page === "products"
+        ? "/admin/products"
+        : "/products",
+    );
+    setProducts(p);
+    if (page === "reports")
+      setOrders(
+        await request("/admin/reports?" + new URLSearchParams(filters)),
+      );
+    if (page === "users")
+      setUsers(
+        await request("/admin/users?" + new URLSearchParams({ search })),
+      );
+    if (page === "orders" && user) setOrders(await request("/purchases"));
+  }
+  useEffect(() => {
+    request("/me")
+      .then(setUser)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    run(load);
+  }, [page, user]);
+  const categories = [...new Set(products.map((p) => p.category))];
+  async function login(e) {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    await run(async () => {
+      if (register) await request("/register", { method: "POST", body: data });
+      await request("/login", {
+        method: "POST",
+        body: new URLSearchParams({
+          username: data.email.trim().toLowerCase(),
+          password: data.password,
+        }),
+      });
+      setUser(await request("/me"));
+      setPage("shop");
+    });
+  }
+  function field(label, name, type = "text", value, onChange) {
+    return (
+      <label>
+        {label}
+        <input
+          name={name}
+          type={type}
+          required
+          value={value}
+          onChange={onChange}
+        />
+      </label>
+    );
+  }
+  return (
+    <>
+      <header className="border-b border-stone-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <a
+            className="text-2xl font-black tracking-tight"
+            href="#"
+            onClick={() => setPage("shop")}
+          >
+            SPORTY<span className="text-orange-600">SHOES.</span>
+          </a>
+          <nav
+            className="flex flex-wrap items-center gap-2"
+            aria-label="Main navigation"
+          >
+            {[
+              ["shop", "Collection"],
+              ...(user
+                ? [
+                    ["orders", "My purchases"],
+                    ["password", "Password"],
+                  ]
+                : []),
+              ...(user?.role === "ADMIN"
+                ? [
+                    ["products", "Products"],
+                    ["users", "Users"],
+                    ["reports", "Reports"],
+                  ]
+                : []),
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                className={page === id ? "bg-orange-600" : "bg-stone-700"}
+                onClick={() => setPage(id)}
+              >
+                {label}
+              </button>
+            ))}
+            {user ? (
+              <button
+                onClick={() =>
+                  run(async () => {
+                    await request("/logout", { method: "POST" });
+                    setUser(null);
+                    setPage("shop");
+                  })
+                }
+              >
+                Sign out
+              </button>
+            ) : (
+              <button onClick={() => setPage("login")}>Sign in</button>
+            )}
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        {error && (
+          <p
+            role="alert"
+            className="mb-5 rounded-lg bg-red-100 p-4 text-red-800"
+          >
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="mb-5 rounded-lg bg-green-100 p-4">
+            {notice}
+          </p>
+        )}
+        {busy && <p role="status">Loading…</p>}
+        {page === "shop" && (
+          <>
+            <section className="mb-9 rounded-3xl bg-stone-900 p-8 text-white sm:p-14">
+              <p className="mb-5 text-sm uppercase tracking-[.3em] text-orange-400">
+                Built for your next step
+              </p>
+              <h1 className="max-w-xl text-5xl font-black leading-tight sm:text-7xl">
+                Move your way.
+              </h1>
+              <p className="mt-6 max-w-lg text-lg text-stone-300">
+                From the first mile to the final rep. Find the shoes that keep
+                you moving.
+              </p>
+            </section>
+            <div className="mb-6 flex items-center justify-between gap-6">
+              <h2 className="mb-0">The collection</h2>
+              <label>
+                Category
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {categories.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {products
+                .filter((p) => !category || p.category === category)
+                .map((p) => (
+                  <article
+                    key={p.id}
+                    className="overflow-hidden rounded-2xl bg-white shadow-sm"
+                  >
+                    <div
+                      className="flex h-40 items-center justify-center bg-orange-100 text-7xl"
+                      aria-hidden="true"
+                    >
+                      👟
+                    </div>
+                    <div className="p-6">
+                      <p className="text-xs uppercase tracking-widest text-orange-700">
+                        {p.category}
+                      </p>
+                      <h3 className="mt-2 text-xl font-bold">{p.name}</h3>
+                      <p className="my-3 text-sm text-stone-600">
+                        {p.description}
+                      </p>
+                      <p className="mb-4 text-lg font-semibold">
+                        {money(p.price)}{" "}
+                        <span className="text-xs font-normal text-stone-500">
+                          {p.stock} in stock
+                        </span>
+                      </p>
+                      <button
+                        disabled={busy || !p.stock}
+                        onClick={() =>
+                          user
+                            ? run(async () => {
+                                await request("/purchases", {
+                                  method: "POST",
+                                  body: { productId: p.id, quantity: 1 },
+                                });
+                                await load();
+                                setNotice(
+                                  "Purchase confirmed. View it in My purchases.",
+                                );
+                              })
+                            : setPage("login")
+                        }
+                      >
+                        {p.stock ? "Buy one pair" : "Sold out"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+            </div>
+            {products.length === 0 && !busy && <p>No products available.</p>}
+          </>
+        )}
+        {page === "login" && (
+          <section className="mx-auto max-w-md rounded-2xl bg-white p-8">
+            <h2>{register ? "Create an account" : "Welcome back"}</h2>
+            <form onSubmit={login} className="space-y-4">
+              {register && field("Name", "name")}
+              {field("Email", "email", "email")}
+              {
+                <label>
+                  Password
+                  <input
+                    name="password"
+                    type="password"
+                    required
+                    minLength={register ? 8 : 1}
+                    maxLength={72}
+                  />
+                </label>
+              }
+              <button disabled={busy}>
+                {register ? "Register and sign in" : "Sign in"}
+              </button>
+            </form>
+            <button
+              className="mt-5 bg-stone-600"
+              onClick={() => setRegister(!register)}
+            >
+              {register ? "Already registered? Sign in" : "Create an account"}
+            </button>
+          </section>
+        )}
+        {page === "password" && (
+          <section className="mx-auto max-w-md rounded-2xl bg-white p-8">
+            <h2>Change password</h2>
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const body = Object.fromEntries(new FormData(e.target));
+                run(async () => {
+                  await request("/password", { method: "POST", body });
+                  setUser(null);
+                  setPage("login");
+                  setNotice(
+                    "Password updated. Sign in with your new password.",
+                  );
+                });
+              }}
+            >
+              {field("Current password", "currentPassword", "password")}
+              <label>
+                New password
+                <input
+                  name="newPassword"
+                  type="password"
+                  minLength="8"
+                  maxLength="72"
+                  required
+                />
+              </label>
+              <button disabled={busy}>Update password</button>
+            </form>
+          </section>
+        )}
+        {page === "products" && (
+          <>
+            <div className="mb-6 flex justify-between">
+              <h2>Manage products</h2>
+              <button onClick={() => setEdit({ ...empty })}>Add product</button>
+            </div>
+            {edit && (
+              <form
+                className="mb-8 grid gap-4 rounded-2xl bg-white p-6 sm:grid-cols-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  run(async () => {
+                    await request(
+                      "/admin/products" + (edit.id ? "/" + edit.id : ""),
+                      {
+                        method: edit.id ? "PUT" : "POST",
+                        body: {
+                          ...edit,
+                          price: Number(edit.price),
+                          stock: Number(edit.stock),
+                        },
+                      },
+                    );
+                    setEdit(null);
+                    await load();
+                    setNotice("Product saved.");
+                  });
+                }}
+              >
+                {["name", "category", "price", "stock", "description"].map(
+                  (k) => (
+                    <label key={k}>
+                      {k}
+                      <input
+                        required={k !== "description"}
+                        type={
+                          ["price", "stock"].includes(k) ? "number" : "text"
+                        }
+                        min={
+                          k === "price"
+                            ? ".01"
+                            : k === "stock"
+                              ? "0"
+                              : undefined
+                        }
+                        step={
+                          k === "price"
+                            ? ".01"
+                            : k === "stock"
+                              ? "1"
+                              : undefined
+                        }
+                        value={edit[k] ?? ""}
+                        onChange={(e) =>
+                          setEdit({ ...edit, [k]: e.target.value })
+                        }
+                      />
+                    </label>
+                  ),
+                )}
+                <label className="flex items-center gap-3">
+                  <input
+                    className="w-auto"
+                    type="checkbox"
+                    checked={edit.active}
+                    onChange={(e) =>
+                      setEdit({ ...edit, active: e.target.checked })
+                    }
+                  />
+                  Visible in shop
+                </label>
+                <button disabled={busy}>Save product</button>
+                <button type="button" onClick={() => setEdit(null)}>
+                  Cancel
+                </button>
+              </form>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full bg-white">
+                <thead>
+                  <tr>
+                    {[
+                      "Product",
+                      "Category",
+                      "Price",
+                      "Stock",
+                      "Status",
+                      "Actions",
+                    ].map((x) => (
+                      <th key={x}>{x}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.name}</td>
+                      <td>{p.category}</td>
+                      <td>{money(p.price)}</td>
+                      <td>{p.stock}</td>
+                      <td>{p.active ? "Active" : "Archived"}</td>
+                      <td className="flex gap-2">
+                        <button onClick={() => setEdit({ ...p })}>Edit</button>
+                        <button
+                          disabled={busy || !p.active}
+                          onClick={() =>
+                            run(async () => {
+                              await request("/admin/products/" + p.id, {
+                                method: "DELETE",
+                              });
+                              await load();
+                            })
+                          }
+                        >
+                          Archive
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {page === "users" && (
+          <>
+            <h2>Registered users</h2>
+            <form
+              className="mb-5 flex gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                run(load);
+              }}
+            >
+              <label className="grow">
+                Search by name or email
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <button disabled={busy}>Search</button>
+            </form>
+            <div className="overflow-x-auto">
+              <table className="w-full bg-white">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Registered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.name}</td>
+                      <td>{u.email}</td>
+                      <td>{u.role}</td>
+                      <td>{new Date(u.createDate).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!users.length && !busy && <p>No matching users.</p>}
+          </>
+        )}
+        {["reports", "orders"].includes(page) && (
+          <>
+            <h2>{page === "reports" ? "Purchase reports" : "My purchases"}</h2>
+            {page === "reports" && (
+              <form
+                className="mb-6 flex flex-wrap items-end gap-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  run(load);
+                }}
+              >
+                {["from", "to"].map((k) => (
+                  <label key={k}>
+                    {k === "from" ? "From (inclusive)" : "To (inclusive)"}
+                    <input
+                      type="date"
+                      value={filters[k]}
+                      onChange={(e) =>
+                        setFilters({ ...filters, [k]: e.target.value })
+                      }
+                    />
+                  </label>
+                ))}
+                <label>
+                  Category
+                  <input
+                    placeholder="All categories"
+                    value={filters.category}
+                    onChange={(e) =>
+                      setFilters({ ...filters, category: e.target.value })
+                    }
+                  />
+                </label>
+                <button disabled={busy}>Apply filters</button>
+              </form>
+            )}
+            <p className="mb-4">
+              {orders.length} purchases · Total{" "}
+              {money(orders.reduce((s, o) => s + Number(o.total), 0))}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full bg-white">
+                <thead>
+                  <tr>
+                    {[
+                      "Date",
+                      "Customer",
+                      "Product",
+                      "Category",
+                      "Quantity",
+                      "Total",
+                    ].map((x) => (
+                      <th key={x}>{x}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={o.id}>
+                      <td>{o.date}</td>
+                      <td>{o.customer}</td>
+                      <td>{o.product}</td>
+                      <td>{o.category}</td>
+                      <td>{o.quantity}</td>
+                      <td>{money(o.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!orders.length && !busy && <p>No purchases found.</p>}
+          </>
+        )}
+      </main>
+      <footer className="mx-auto max-w-6xl px-6 py-10 text-sm text-stone-500">
+        SportyShoes · Stakeholder prototype · Purchases are simulated; no
+        payment is collected.
+      </footer>
+    </>
+  );
 }
-
